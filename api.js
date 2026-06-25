@@ -1,5 +1,4 @@
-等一下我现在在调前面说的那个API的移动 现在想起来了 是不是剪切这里
-  // ========== 全局 API 调用（含完整世界观设定） ==========
+ // ========== 全局 API 调用（含完整世界观设定） ==========
 async function callDeepSeek(prompt, callback, context = 'general') {
   const apiKey = localStorage.getItem('idolPhoneApiKey');
   if (!apiKey) {
@@ -121,7 +120,8 @@ function getPersonalityByContact(contactId) {
     wangyuan: '大师兄，温柔开朗',
     yiyangqianxi: '大师兄，话少但温暖',
     majiaqi: 'TNT队长，专业严格但关心后辈',
+    agent: '经纪人，关心艺人事业，精明干练，有时为艺人争取利益时会比较强势',
     lifei: '时代峰峻老板，话少，只关心业绩和资源'
-  };
-  return map[contactId] || '性格不明';
+     };
+  return map[contactId] || '根据对方的身份和你与TA的关系来交流';
 }
