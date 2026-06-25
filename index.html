@@ -1734,6 +1734,11 @@ input[type="text"], input[type="number"], select {
  
 @import url('https://fonts.googleapis.com/css2?family=Zhi+Mang+Xing&display=swap');
   
+  /* 全局图片自适应 */
+img {
+  object-fit: cover;
+}
+  
 </style>
 </head>
 <body>
@@ -2686,8 +2691,13 @@ function loadSaveSlots() {
   while (SAVE_SLOTS.manual.length < SAVE_SLOTS.maxManual) SAVE_SLOTS.manual.push(null);
 }
 function saveSaveSlots() {
-  localStorage.setItem('idolPhoneSaveSlots', JSON.stringify({ manual: SAVE_SLOTS.manual, auto: SAVE_SLOTS.auto, maxManual: SAVE_SLOTS.maxManual }));
+  try {
+    localStorage.setItem('idolPhoneSaveSlots', JSON.stringify({ manual: SAVE_SLOTS.manual, auto: SAVE_SLOTS.auto, maxManual: SAVE_SLOTS.maxManual }));
+  } catch (e) {
+    console.warn('存档保存失败，存储空间不足');
+  }
 }
+  
 function getProgressSummary() {
   const ch = GAME_STATE.playerCharacter;
   if (!ch) return { name:'未创建角色', day:0, influence:0, money:0 };
@@ -3533,6 +3543,10 @@ function processGift(gift, from) {
     from, gift: gift.name, icon: gift.icon, value: gift.value,
     time: new Date().toLocaleTimeString()
   });
+  // 限制最多50条
+if (GAME_STATE.giftsReceived.length > 50) {
+  GAME_STATE.giftsReceived.shift(); // 删除最早的一条
+}
   addDanmakuToUI(`🎁 ${from} 送出 ${gift.icon}${gift.name} ×1`, '#FFD700', 'gift');
 }
 
@@ -4953,7 +4967,7 @@ function getAvatarUrl(type, contactId, fallbackAvatar = '') {
 function getContactAvatarHtml(type, contactId, fallbackAvatar = '', size = 42) {
   const url = getAvatarUrl(type, contactId, fallbackAvatar);
   if (url) {
-    return `<div class="chat-avatar" style="background-image:url('${url}');width:${size}px;height:${size}px;border-radius:8px;flex-shrink:0;cursor:pointer;" onclick="event.stopPropagation();openAvatarCustomizer('${type}','${contactId}')"></div>`;
+     return `<img src="${url}" style="width:${size}px;height:${size}px;border-radius:8px;object-fit:cover;flex-shrink:0;cursor:pointer;" onclick="event.stopPropagation();openAvatarCustomizer('${type}','${contactId}')">`;
   }
   const emoji = getContactEmoji(contactId);
   return `<div class="chat-avatar-placeholder" onclick="event.stopPropagation();openAvatarCustomizer('${type}','${contactId}')" style="width:${size}px;height:${size}px;border-radius:8px;font-size:${Math.floor(size/2)}px;background:#F0E0E5;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;">${emoji}</div>`;
@@ -5283,7 +5297,7 @@ const MOMENTS_PRESET = {
     { text: '练习到凌晨三点，但看到成果一切都值了', imagePrompt: '凌晨空荡的练习室，灯还亮着，地板上全是汗水痕迹', comments: ['zhuzhixin:别太拼了', 'zhangzev:注意身体啊帅帅'] },
     { text: '新歌的舞蹈真的很难，但我们会跳好的💪', imagePrompt: '排练室全景，五个人的影子投在墙上', comments: ['zhuzhixin:相信你', 'zuohang:一起加油'] },
     { text: '今天和队长一起排练到很晚，但很开心', imagePrompt: '两人在镜子前比心的倒影', comments: ['zhuzhixin:帅帅也辛苦了', 'zhangji:这什么神仙默契'] },
-    { text: '重庆人想念火锅了🥺', imagePrompt: '练习室角落，手机屏幕上是减脂餐的外卖页面', comments: ['zhangzev:下次一起喝', 'zhuzhixin:练完带你去'] },
+    { text: '重庆人想念火锅了🥺', imagePrompt: '练习室角落，手机屏幕上是减脂餐的外卖页面', comments: ['zhangzev:下次一起吃', 'zhuzhixin:练完带你去'] },
     { text: '今天的舞台效果应该会很好，期待', imagePrompt: '舞台灯光下，五个人排练的背影', comments: ['zuohang:帅帅编舞越来越强', 'zhangji:期待舞台'] },
     { text: '粉丝的应援看到了，谢谢信号灯们🚦', imagePrompt: '手机拍的手写信和应援物', comments: ['zhuzhixin:粉丝们有心了', 'zhangzev:感动'] },
     { text: '新学的编舞风格好难，但帅帅不会放弃', imagePrompt: '平板电脑上播放着国外舞蹈视频', comments: ['zhuzhixin:你肯定行', 'zhangji:加油帅帅'] },
@@ -5590,20 +5604,11 @@ function renderWechatMoments(container) {
   moments.forEach(m => {
     // 头像
     let avatarHtml = '';
-    if (m.authorId === 'me') {
-      const myAvatar = getMyAvatar();
-      if (myAvatar) {
-        avatarHtml = `<div class="chat-avatar" style="background-image:url('${myAvatar}'); width:40px; height:40px; border-radius:6px;"></div>`;
-      } else {
-        avatarHtml = `<div class="chat-avatar-placeholder" style="width:40px; height:40px; border-radius:6px; font-size:18px;">${(player.name || '我')[0]}</div>`;
-      }
+       if (m.authorId === 'me') {
+      avatarHtml = getMyAvatarHtml('wechat', 40);
     } else {
       const contact = WECHAT_CONTACTS.find(c => c.id === m.authorId);
-      if (contact?.avatar) {
-        avatarHtml = `<div class="chat-avatar" style="background-image:url('${contact.avatar}'); width:40px; height:40px; border-radius:6px;"></div>`;
-      } else {
-        avatarHtml = `<div class="chat-avatar-placeholder" style="width:40px; height:40px; border-radius:6px; font-size:18px;">${getContactAvatar(contact || {})}</div>`;
-      }
+      avatarHtml = getContactAvatarHtml('wechat', m.authorId, contact?.avatar || '', 40);
     }
 
         // 点赞行（可交互）
@@ -6109,9 +6114,12 @@ function renderWechatChatList(container) {
 
   let html = '';
   messageList.forEach(msg => {
-    // 头像：有URL用图片，没有用emoji占位
+       // 头像：优先微信自定义，其次预设，最后emoji占位
     let avatarHtml = '';
-    if (msg.avatar) {
+    const customUrl = getAvatarUrl('wechat', msg.id, msg.avatar);  // 先查微信自定义
+    if (customUrl) {
+      avatarHtml = `<img src="${customUrl}" style="width:48px; height:48px; border-radius:8px; object-fit:cover; flex-shrink:0;">`;
+    } else if (msg.avatar) {
       avatarHtml = `<img src="${msg.avatar}" style="width:48px; height:48px; border-radius:8px; object-fit:cover; flex-shrink:0;">`;
     } else {
       avatarHtml = `<div style="width:48px; height:48px; border-radius:8px; background:#F0E0E5; display:flex; align-items:center; justify-content:center; font-size:24px; flex-shrink:0;">${msg.avatarEmoji}</div>`;
@@ -6757,7 +6765,9 @@ function buildVideoCallUI() {
     </div>
 
     <!-- 本人小窗（点击弹出设置） -->
-    <div class="self-window" id="vcSelfWindow" style="background-color:${state.selfBgColor}; ${state.selfBgImage ? `background-image:url(${state.selfBgImage});` : ''}" onclick="showVideoSettings()"></div>
+   <div class="self-window" id="vcSelfWindow" style="background-color:${state.selfBgColor};" onclick="showVideoSettings()">
+  ${state.selfBgImage ? `<img src="${state.selfBgImage}" style="width:100%;height:100%;object-fit:cover;border-radius:12px;">` : ''}
+</div>
 
     <!-- 字幕 -->
     <div class="video-subtitle" id="vcSubtitle" style="display:none;"></div>
@@ -6990,10 +7000,18 @@ function setVideoBg(type, value, mediaType) {
       state.selfBgColor = '';
       state.selfBgVideo = '';
     }
-    const self = document.getElementById('vcSelfWindow');
+       const self = document.getElementById('vcSelfWindow');
     if (self) {
-      self.style.backgroundColor = state.selfBgColor || 'transparent';
-      self.style.backgroundImage = state.selfBgImage ? `url(${state.selfBgImage})` : '';
+      if (mediaType === 'video') {
+        self.innerHTML = `<video autoplay loop muted playsinline style="width:100%;height:100%;object-fit:cover;border-radius:12px;"><source src="${value}" type="video/mp4"></video>`;
+        self.style.backgroundColor = '';
+      } else if (value.startsWith('#')) {
+        self.style.backgroundColor = value;
+        self.innerHTML = '';
+      } else {
+        self.innerHTML = `<img src="${value}" style="width:100%;height:100%;object-fit:cover;border-radius:12px;">`;
+        self.style.backgroundColor = '';
+      }
     }
   }
   closeConfirm();
@@ -7396,7 +7414,9 @@ function renderCustomForm() {
       <div style="margin-bottom:8px;"><label style="font-weight:600;">粉丝风格（多选）</label><div class="form-row">${['温柔陪伴型','鸡血战斗型','沙雕整活型','严格事业型'].map(fs => `<label style="margin-right:8px;"><input type="checkbox" class="fanstyle-check" value="${fs}"> ${fs}</label>`).join('')}</div></div>
       <input type="text" placeholder="粉丝怎么叫你" id="custFanCall" style="width:100%;">
     </div>
-    <button class="custom-role-btn" onclick="createCustomRole()" style="width:100%;margin-top:10px;">✨ 确认创建</button>
+    <div style="text-align:center;">
+  <button class="custom-role-btn" onclick="createCustomRole()" style="width:90%;margin-top:10px;">✨ 确认创建</button>
+</div>
   `;
   updateStatRemaining();
   // 初始化队友管理
@@ -7724,8 +7744,10 @@ function showConfirm(title, msg, callback) {
     const id = this.getAttribute('data-confirm');
     const fn = _confirmCallbacks[id];
     closeConfirm();
-    if (typeof fn === 'function') {
-      fn();                // 执行真正的回调（闭包安全）
+       if (typeof fn === 'function') {
+      fn();
+    } else {
+      showToast('操作失败，请重试');
     }
     delete _confirmCallbacks[id];  // 清理
   };
@@ -7785,10 +7807,15 @@ function deleteAutoSlot() {
 function addManualSlot() { SAVE_SLOTS.maxManual++; SAVE_SLOTS.manual.push(null); saveSaveSlots(); renderSaveApp(document.getElementById('contentBody')); showToast('槽位已增加'); }
 function tryAutoSave() {
   if (!GAME_STATE.playerCharacter) return;
-  const lastAuto = SAVE_SLOTS.auto ? new Date(SAVE_SLOTS.auto.timestamp) : null;
-  const today = new Date().toDateString();
-  if (!lastAuto || new Date(lastAuto).toDateString() !== today) {
-    SAVE_SLOTS.auto = createSaveData(); saveSaveSlots();
+  try {
+    const lastAuto = SAVE_SLOTS.auto ? new Date(SAVE_SLOTS.auto.timestamp) : null;
+    const today = new Date().toDateString();
+    if (!lastAuto || new Date(lastAuto).toDateString() !== today) {
+      SAVE_SLOTS.auto = createSaveData();
+      saveSaveSlots();
+    }
+  } catch (e) {
+    console.warn('自动存档失败');
   }
 }
 
