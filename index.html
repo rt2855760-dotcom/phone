@@ -8199,23 +8199,39 @@ document.addEventListener('click', function(e) {
   }
 }, true);
 
-  // 首次访问提示：推荐使用Chrome浏览器获得完整体验
-(function() {
-  if (localStorage.getItem('meow_browser_tip_shown')) return;
-  const ua = navigator.userAgent.toLowerCase();
-  const isAndroid = ua.includes('android');
-  const isChrome = ua.includes('chrome') && !ua.includes('edg');
-  
-  if (isAndroid && !isChrome) {
-    setTimeout(() => {
-      showConfirm('📱 完整体验提示', 
-        '推荐使用 <b>Chrome 浏览器</b> 打开本游戏，<br>可将其安装到手机桌面，像真正的 App 一样全屏运行！<br><br>当前浏览器可正常游玩，但无法安装到桌面。',
-        function() {}
-      );
-      localStorage.setItem('meow_browser_tip_shown', '1');
-    }, 2000);
-  }
-})();
+   // 首次访问提示：推荐使用Chrome浏览器获得完整体验
+  (function() {
+    if (localStorage.getItem('meow_browser_tip_shown')) return;
+    const ua = navigator.userAgent.toLowerCase();
+    const isAndroid = ua.includes('android');
+    const isChrome = ua.includes('chrome') && !ua.includes('edg');
+    
+    if (isAndroid && !isChrome) {
+      setTimeout(() => {
+        // 直接用DOM创建弹窗，不走showConfirm
+        const overlay = document.getElementById('modalOverlay');
+        const card = document.getElementById('modalCard');
+        if (!overlay || !card) return;
+        
+        card.innerHTML = `
+          <div class="modal-title">📱 完整体验提示</div>
+          <div class="modal-text">
+            推荐使用 <b>Chrome 浏览器</b> 打开本游戏，<br>可将其安装到手机桌面，像真正的 App 一样全屏运行！<br><br>当前浏览器可正常游玩，但无法安装到桌面。
+          </div>
+          <div class="modal-buttons">
+            <button class="modal-btn primary" id="meowBrowserTipClose">确认</button>
+          </div>
+        `;
+        overlay.classList.add('active');
+        
+        document.getElementById('meowBrowserTipClose').onclick = function() {
+          overlay.classList.remove('active');
+        };
+        
+        localStorage.setItem('meow_browser_tip_shown', '1');
+      }, 2000);
+    }
+  })();
   
 document.addEventListener('DOMContentLoaded', init);
 </script>
