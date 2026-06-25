@@ -687,7 +687,7 @@ input[type="text"], input[type="number"], select {
   display: none;
   align-items: center;
   justify-content: center;
-  z-index: 30;
+  z-index: 1000 !important;   /* 改这里 */
 }
 .modal-overlay.active { display: flex; }
 .modal-card {
@@ -946,7 +946,7 @@ input[type="text"], input[type="number"], select {
 .live-fullscreen {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
-  z-index: 20;
+  z-index: 999 !important;
   display: flex;
   flex-direction: column;
   background: #000;
@@ -1361,7 +1361,7 @@ input[type="text"], input[type="number"], select {
 .video-call-fullscreen {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
-  z-index: 20;
+  z-index: 999 !important;
   background: #000;
   display: flex;
   flex-direction: column;
@@ -1380,7 +1380,7 @@ input[type="text"], input[type="number"], select {
   display: flex;
   align-items: center;
   padding: 8px 14px;
-  background: rgba(0,0,0,0.5);
+  background:  transparent;   /* 从 rgba(0,0,0,0.5) 改为 transparent */
   z-index: 10;
   height: 44px;
 }
@@ -1707,14 +1707,14 @@ input[type="text"], input[type="number"], select {
   bottom: 180px;
   left: 20px; right: 20px;
   background: rgba(255,240,243,0.95);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   border-radius: 16px;
   padding: 16px;
   z-index: 15;
   color: #8B5E6B;
-  box-shadow: 0 6px 20px rgba(255,133,162,0.2);
+  box-shadow: none;           /* 去掉阴影 */
   border: 1px solid rgba(255,179,198,0.4);
+  backdrop-filter: none;      /* 去掉毛玻璃 */
+  -webkit-backdrop-filter: none;
 }
 .video-settings-menu .menu-item {
   display: flex;
@@ -2740,6 +2740,8 @@ function showPage(pageName) {
 }
 function goHome() { showPage('desktop'); renderDesktop(); updateAllClocks(); }
 function openApp(appName) {
+  wechatChatOpen = null;
+  wechatPanelType = null;
   document.getElementById('floatingNotif').classList.remove('show');
   showPage('content');
   document.getElementById('contentTitle').textContent = getAppTitle(appName);
@@ -2848,6 +2850,7 @@ function openApp(appName) {
         </div>
       </div>
     `;
+      body.style.overflow = 'auto';
     return;
   }
 
@@ -2937,6 +2940,7 @@ function openApp(appName) {
       `).join('') || '<div class="app-list-item" style="color:var(--text-sub);justify-content:center;">暂无礼物</div>'}
     </div>
   `;
+      body.style.overflow = 'auto';
 }
   
 // 从设备选择图片
@@ -3037,6 +3041,9 @@ function startLiveFromSetup() {
 
 // 开始直播
 function startLive(config) {
+   // 隐藏导航栏（返回按钮）
+  const header = document.getElementById('contentHeader');
+  if (header) header.style.display = 'none';
   const player = GAME_STATE.playerCharacter;
   if (!player || GAME_STATE.liveInProgress) return;
 
@@ -3625,6 +3632,9 @@ function minimizeLive() {
 
   const ui = document.getElementById('liveFullscreen');
   if (ui) ui.remove();
+   // 恢复导航栏
+  const header = document.getElementById('contentHeader');
+  if (header) header.style.display = '';
   if (typeof openApp === 'function') openApp('live');
 }
 
@@ -3700,6 +3710,10 @@ function endLive() {
     saveState();
     showToast(`直播结束！收入 ${live.income.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 元`);
    }
+   // ✅ 恢复导航栏（无论是否成功保存，都要恢复）
+  const header = document.getElementById('contentHeader');
+  if (header) header.style.display = '';
+  
   // 5. 移除UI
   const ui = document.getElementById('liveFullscreen');
   if (ui) ui.remove();
@@ -4216,7 +4230,8 @@ function confirmWithdraw() {
   
  // ========== 聊天菜单 ==========
 function showChatMenu(contactId) {
-  const contact = WECHAT_CONTACTS.find(c => c.id === contactId);
+  const contact = WECHAT_CONTACTS.find(c => c.id === contactId) || 
+                   (GAME_STATE.customContacts || []).find(c => c.id === contactId);
   if (!contact) return;
   const oldMenu = document.getElementById('chatMenuPopup');
   if (oldMenu) oldMenu.remove();
@@ -4281,31 +4296,21 @@ function showChatMenu(contactId) {
 
   document.getElementById('mainScreen').appendChild(menu);
 
-  // 点击菜单外部关闭
-  setTimeout(function() {
-    var closeHandler = function(e) {
-      if (!menu.contains(e.target) && e.target.id !== 'chatMenuBtn') {
-        hideChatMenu();
-        document.removeEventListener('click', closeHandler);
-      }
-    };
-    document.addEventListener('click', closeHandler);
-  }, 10);
+  // 点击菜单外部关闭（修复内存泄漏）
+  const closeHandler = function(e) {
+    if (!menu.contains(e.target) && e.target.id !== 'chatMenuBtn') {
+      menu.remove();
+      document.removeEventListener('click', closeHandler);
+    }
+  };
+  setTimeout(() => document.addEventListener('click', closeHandler), 10);
 }
 
 function hideChatMenu() {
   const menu = document.getElementById('chatMenuPopup');
   if (menu) menu.remove();
-  document.removeEventListener('click', closeChatMenuOnOutside);
+  // 监听器随着菜单移除而失效，无需额外操作
 }
-
-function closeChatMenuOnOutside(e) {
-  const menu = document.getElementById('chatMenuPopup');
-  if (menu && !menu.contains(e.target) && e.target.id !== 'chatMenuBtn') {
-    hideChatMenu();
-  }
-}
-
 // 查看联系人主页
 function viewContactProfile(contactId) {
   const contact = WECHAT_CONTACTS.find(c => c.id === contactId);
@@ -4391,8 +4396,12 @@ function openAvatarCustomizer(type, contactId) {
     GAME_STATE.customAvatars[type][contactId] = base64;
     saveState();
     showToast('头像已更新 ✅');
-    // 如果当前正在看主页，则刷新
+    // 如果当前在查看联系人主页，刷新主页
     if (wechatChatOpen) viewContactProfile(contactId);
+    // 如果当前在聊天界面，刷新聊天界面以显示新头像
+    if (wechatChatOpen) {
+      renderWechatChatInterface(wechatChatOpen);
+    }
   });
 }
 
@@ -4408,7 +4417,7 @@ function changeChatBackground(contactId) {
       ${presetColors.map(c => `<div onclick="saveChatBackground('${contactId}','${c}')" style="width:40px;height:40px;border-radius:50%;background:${c};border:2px solid #ddd;cursor:pointer;"></div>`).join('')}
     </div>
     <div style="font-size:13px; color:#999; margin-bottom:8px;">从设备选图</div>
-    <button class="modal-btn secondary" onclick="closeConfirm(); pickImageFromDevice(function(data){ saveChatBackgroundImage('${contactId}', data); })">📷 选择图片</button>
+    <button class="modal-btn secondary" onclick="pickImageFromDevice(function(data){ saveChatBackgroundImage('${contactId}', data); })">📷 选择图片</button>
     <div style="text-align:right; margin-top:10px;"><button class="modal-btn secondary" onclick="closeConfirm()">取消</button></div>
   `;
   modal.classList.add('active');
@@ -4417,16 +4426,43 @@ function changeChatBackground(contactId) {
 // 新增保存图片背景的函数
 function saveChatBackgroundImage(contactId, base64Data) {
   if (!GAME_STATE.chatBackgrounds) GAME_STATE.chatBackgrounds = {};
-  GAME_STATE.chatBackgrounds[contactId] = base64Data;
+  GAME_STATE.chatBackgrounds[contactId] = base64Data;  // 保存图片base64
   saveState();
   closeConfirm();
   showToast('背景已更换');
-  if (wechatChatOpen) renderWechatChatInterface(contactId);
+
+  // 如果当前打开的聊天就是该联系人，直接更新样式
+  if (wechatChatOpen === contactId) {
+    const msgDiv = document.getElementById('chatMessages');
+    if (msgDiv) {
+      msgDiv.style.backgroundImage = `url(${base64Data})`;
+      msgDiv.style.backgroundSize = 'cover';
+      msgDiv.style.backgroundPosition = 'center';
+      msgDiv.style.backgroundColor = '';   // ← 只清除纯色，保留图片
+    }
+  }
 }
 
 // 在 renderWechatChatInterface 中应用背景颜色：搜索该函数，将 chat-messages 的 style 改为：
 // style="background:${GAME_STATE.chatBackgrounds?.[contactId] || '#F8F8F8'};"
+function saveChatBackground(contactId, color) {
+  if (!GAME_STATE.chatBackgrounds) GAME_STATE.chatBackgrounds = {};
+  GAME_STATE.chatBackgrounds[contactId] = color;  // 保存纯色
+  saveState();
+  closeConfirm();
+  showToast('背景已更换');
 
+  // 如果当前打开的聊天就是该联系人，直接更新样式，不重建DOM
+  if (wechatChatOpen === contactId) {
+    const msgDiv = document.getElementById('chatMessages');
+    if (msgDiv) {
+      msgDiv.style.background = color;
+      msgDiv.style.backgroundImage = '';   // 清除图片
+      msgDiv.style.backgroundSize = '';
+      msgDiv.style.backgroundPosition = '';
+    }
+  }
+}
 // 置顶聊天
 function togglePinChat(contactId) {
   const thread = getMessageThread(contactId);
@@ -4791,7 +4827,7 @@ function getMessageThread(contactId) {
       } else if (lastMsg.type === 'voice') {
         preview = '[语音] ' + (lastMsg.duration || '');
       } else if (lastMsg.type === 'transfer') {
-        preview = '[转账] ' + lastMsg.amount + '万元';
+        preview = '[转账] ' + (lastMsg.amountWan || lastMsg.amount || '0') + '元';
       }
       GAME_STATE.messageThreads[contactId] = {
         lastMessage: preview,
@@ -4888,19 +4924,6 @@ function getWechatMessageList() {
 
   return list;
 }
-  // ========== 联系人头像系统（支持多平台自定义） ==========
-
-// 获取联系人头像的 URL（先查自定义，再查预设，均无则返回空）
-function getAvatarUrl(type, contactId, fallbackAvatar = '') {
-  // 1. 检查玩家自定义的头像
-  if (GAME_STATE.customAvatars && GAME_STATE.customAvatars[type]?.[contactId]) {
-    return GAME_STATE.customAvatars[type][contactId];
-  }
-  // 2. 使用预设头像（WECHAT_CONTACTS 中的 avatar 字段）
-  if (fallbackAvatar) return fallbackAvatar;
-  // 3. 无头像，返回空字符串（后续用占位符）
-  return '';
-}
 
 // 获取联系人头像emoji占位符
 function getContactEmoji(contactOrId) {
@@ -4947,13 +4970,6 @@ function getMyAvatarHtml(type = 'wechat', size = 42) {
 function getContactAvatar(contact) {
   if (!contact) return '👤';
   return getContactEmoji(contact);
-}
-
-// getMyAvatar（旧版兼容）
-function getMyAvatar() {
-  const player = GAME_STATE.playerCharacter;
-  if (!player) return '';
-  return getAvatarUrl('wechat', player.id, player.avatar || '');
 }
   
 function openNewFriends() {
@@ -6069,11 +6085,6 @@ function renderWechatProfile(container) {
         <div class="app-list-content"><div class="app-list-title">账单明细</div></div>
         <span class="app-list-arrow">›</span>
       </div>
-           <div class="app-list-item" onclick="openMyMoments()">
-        <span class="app-list-icon">📋</span>
-        <div class="app-list-content"><div class="app-list-title">我的朋友圈</div></div>
-        <span class="app-list-arrow">›</span>
-      </div>
       <div class="app-list-item" onclick="openMyFavorites()">
         <span class="app-list-icon">⭐</span>
         <div class="app-list-content"><div class="app-list-title">收藏</div></div>
@@ -6447,14 +6458,14 @@ function refreshChatMessages() {
     } else if (msg.type === 'voice') {
       html += renderVoiceMsg(msg, contact);
     } else {
-      const side = msg.sender === 'me' ? 'mine' : 'theirs';
+           const side = msg.sender === 'me' ? 'mine' : 'theirs';
       let avatarHtml = '';
-      if (side === 'theirs' && contact) {
-        if (contact.avatar) {
-          avatarHtml = `<div class="chat-avatar" style="background-image:url('${contact.avatar}')"></div>`;
-        } else {
-          avatarHtml = `<div class="chat-avatar-placeholder">${getContactAvatar(contact)}</div>`;
-        }
+      const avatarUrl = side === 'theirs' ? (contact?.avatar || '') : getMyAvatar();
+      const placeholderText = side === 'theirs' ? getContactAvatar(contact || {}) : (GAME_STATE.playerCharacter?.name?.[0] || '我');
+      if (avatarUrl) {
+        avatarHtml = `<div class="chat-avatar" style="background-image:url('${avatarUrl}')"></div>`;
+      } else {
+        avatarHtml = `<div class="chat-avatar-placeholder">${placeholderText}</div>`;
       }
       html += `
         <div class="chat-msg-row ${side}">
@@ -6468,9 +6479,23 @@ function refreshChatMessages() {
   });
 
   msgDiv.innerHTML = html || '<div style="text-align:center;color:#ccc;padding:40px;">开始聊天吧~</div>';
-  msgDiv.scrollTop = msgDiv.scrollHeight;
-}
+    msgDiv.scrollTop = msgDiv.scrollHeight;
 
+  // 重新应用聊天背景
+  const bgValue = GAME_STATE.chatBackgrounds?.[contactId] || '#F8F8F8';
+  const isImage = bgValue.startsWith('data:image') || bgValue.startsWith('http');
+  if (isImage) {
+    msgDiv.style.backgroundImage = `url(${bgValue})`;
+    msgDiv.style.backgroundSize = 'cover';
+    msgDiv.style.backgroundPosition = 'center';
+    msgDiv.style.backgroundColor = '';
+  } else {
+    msgDiv.style.background = bgValue;
+    msgDiv.style.backgroundImage = '';
+    msgDiv.style.backgroundSize = '';
+    msgDiv.style.backgroundPosition = '';
+  }
+}   // ← 这是 refreshChatMessages 的结束大括号
 // 对方回复
 function replyFromContact(contactId) {
   const player = GAME_STATE.playerCharacter;
@@ -6660,6 +6685,9 @@ function openVideoCallPanel(contactId) {
 
 // 开始视频通话
 function startVideoCall(contactId, mode) {
+   // 隐藏导航栏（返回按钮）
+  const header = document.getElementById('contentHeader');
+  if (header) header.style.display = 'none';
   const contact = WECHAT_CONTACTS.find(c => c.id === contactId);
   const player = GAME_STATE.playerCharacter;
   if (!contact || !player) return;
@@ -6900,13 +6928,30 @@ function changeVideoBg(type) {
         <div onclick="setVideoBg('${type}', '${c}')" style="width:36px;height:36px;border-radius:50%;background:${c};border:2px solid #FFB3C6;cursor:pointer;"></div>
       `).join('')}
     </div>
-    <button class="modal-btn secondary" onclick="closeConfirm(); pickImageFromDevice(function(data){ setVideoBg('${type}', data); })" style="background:#FFB3C6;color:#FFF;border:none;">📷 从设备选图片</button>
-    <button class="modal-btn secondary" style="margin-top:8px;background:#FFB3C6;color:#FFF;border:none;" onclick="closeConfirm(); pickVideoFromDevice(function(data){ setVideoBg('${type}', data, 'video'); })">📹 从设备选视频</button>
+        <div style="margin-top:8px;">
+      <!-- 第一行：URL输入框 + 应用按钮 -->
+      <div style="display:flex; gap:6px; margin-bottom:6px;">
+        <input type="text" id="videoBgUrlInput" placeholder="输入图片/视频URL" style="flex:1; padding:8px; border:1px solid #FFB3C6; border-radius:8px; font-size:13px;">
+        <button class="modal-btn secondary" style="background:#FFB3C6;color:#FFF;border:none;white-space:nowrap;" onclick="applyVideoBgUrl('${type}')">应用URL</button>
+      </div>
+      <!-- 第二行：两个选择按钮并排 -->
+      <div style="display:flex; gap:6px;">
+        <button class="modal-btn secondary" onclick="closeConfirm(); pickImageFromDevice(function(data){ setVideoBg('${type}', data); })" style="flex:1;background:#FFB3C6;color:#FFF;border:none;">📷 选图片</button>
+        <button class="modal-btn secondary" style="flex:1;background:#FFB3C6;color:#FFF;border:none;" onclick="closeConfirm(); pickVideoFromDevice(function(data){ setVideoBg('${type}', data, 'video'); })">📹 选视频</button>
+      </div>
+    </div>
     <div style="text-align:right; margin-top:12px;"><button class="modal-btn secondary" onclick="closeConfirm()">取消</button></div>
   `;
   modal.classList.add('active');
 }
 
+  function applyVideoBgUrl(type) {
+  const url = document.getElementById('videoBgUrlInput')?.value.trim();
+  if (!url) { showToast('请输入有效的URL'); return; }
+  closeConfirm();
+  const isVideo = url.endsWith('.mp4') || url.endsWith('.webm') || url.startsWith('data:video');
+  setVideoBg(type, url, isVideo ? 'video' : 'image');
+}
 // 设置背景（无变动）
 function setVideoBg(type, value, mediaType) {
   const state = videoCallState;
@@ -6976,12 +7021,28 @@ function describeVideoScene() {
   hideVideoSettings();
   const state = videoCallState;
   if (!state) return;
-  const desc = prompt('描述你当前的画面状态：', state.sceneDesc || '');
-  if (desc !== null) {
-    state.sceneDesc = desc.trim();
-    showToast('画面描述已更新');
-    if (state.mode === 'api') generateVideoSubtitle();
+
+  const modal = document.getElementById('modalOverlay');
+  const card = document.getElementById('modalCard');
+  card.innerHTML = `
+    <div class="modal-title">✏️ 描述当前画面</div>
+    <textarea id="videoSceneDesc" style="width:100%; height:60px; border:1px solid #ddd; border-radius:8px; padding:8px; font-size:13px; resize:none;">${state.sceneDesc || ''}</textarea>
+    <div class="modal-buttons" style="margin-top:10px;">
+      <button class="modal-btn secondary" onclick="closeConfirm()">取消</button>
+      <button class="modal-btn primary" onclick="saveVideoScene()">保存</button>
+    </div>
+  `;
+  modal.classList.add('active');
+}
+
+function saveVideoScene() {
+  const desc = document.getElementById('videoSceneDesc')?.value.trim();
+  if (desc && videoCallState) {
+    videoCallState.sceneDesc = desc;
+    if (videoCallState.mode === 'api') generateVideoSubtitle();
   }
+  closeConfirm();
+  showToast('画面描述已更新');
 }
 
 // 生成字幕（无变动）
@@ -7049,6 +7110,9 @@ function endVideoCall() {
 
   const ui = document.getElementById('videoCallFullscreen');
   if (ui) ui.remove();
+  // 4. 恢复导航栏
+  const header = document.getElementById('contentHeader');
+  if (header) header.style.display = '';
 }
 
 function formatDuration(sec) {
@@ -7083,7 +7147,10 @@ function toggleVoiceMode() {
 }
   
 function getContactName(contactId) {
-  const contact = WECHAT_CONTACTS.find(c => c.id === contactId);
+  if (contactId === 'me') return GAME_STATE.playerCharacter?.name || '我';
+  const contact = WECHAT_CONTACTS.find(c => c.id === contactId)
+               || (GAME_STATE.customContacts || []).find(c => c.id === contactId)
+               || (GAME_STATE.playerCharacter?.customTeammates || []).find(t => t.id === contactId);
   return contact ? contact.name : contactId;
 }
 
@@ -7492,39 +7559,6 @@ function removeTeammateRow(index) {
   delete window['_tmAvatar_' + index];
 }
   
-  // 从设备本地选择图片，回调返回 base64
-function pickImageFromDevice(callback) {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'image/*';
-  input.onchange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      callback(ev.target.result);
-    };
-    reader.readAsDataURL(file);
-  };
-  input.click();
-}
-
-// 从设备本地选择视频，回调返回 base64
-function pickVideoFromDevice(callback) {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'video/*';
-  input.onchange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      callback(ev.target.result);
-    };
-    reader.readAsDataURL(file);
-  };
-  input.click();
-}
 
 // ========== Toast ==========
 function showToast(msg) {
