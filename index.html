@@ -1765,6 +1765,17 @@ img {
 </head>
 <body>
 
+  <!-- 加载页面 -->
+<div id="loadingScreen" style="position:fixed; top:0; left:0; width:100%; height:100%; background:#FFF0F3; z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center; font-family: sans-serif;">
+  <div style="width:80px; height:80px; border-radius:20px; background: linear-gradient(135deg, #FFB3C6, #FF85A2); display:flex; align-items:center; justify-content:center; font-size:40px; margin-bottom:20px; box-shadow: 0 4px 12px rgba(255,133,162,0.3);">
+    <img src="https://i.ibb.co/rDfP77z/retouch-2026062601300656.jpg" style="width:80px; height:80px; border-radius:20px; object-fit:cover; box-shadow: 0 4px 12px rgba(255,133,162,0.3);">
+  </div>
+  <div style="font-size:18px; font-weight:700; color:#E75480; margin-bottom:8px;">喵の小手机</div>
+  <div style="width:200px; height:6px; background:#FCE4EC; border-radius:3px; overflow:hidden;">
+    <div id="loadingBar" style="width:0%; height:100%; background: linear-gradient(90deg, #FF85A2, #E75480); border-radius:3px; transition: width 0.3s;"></div>
+  </div>
+</div>
+
 <div class="phone-case" id="phoneCase">
   <div class="screen" id="mainScreen">
 
@@ -1916,7 +1927,46 @@ img {
 </div>
 
 <script>
-if (typeof location.removedBy !== 'undefined') {
+// ========== 资源预加载 ==========
+(function preloadResources() {
+  const imagesToPreload = [
+    'https://i.ibb.co/pBPH8sFG/mmexport1781783383312.jpg',
+    'https://i.ibb.co/mVmDWc4x/mmexport1781783370899.jpg',
+    'https://i.ibb.co/zhfVmNH8/img-fc7e6c966b788d50f24e34e9dd20bd0277948ee730109350b09b4ab128169df4.jpg',
+    'https://i.ibb.co/B2GTK0Qd/img-136c536ce7dd4777d823b0b8d074720d0fde98b2018542605e8d6fd0b1dd0a53.jpg',
+    'https://i.ibb.co/mFTTfXVs/img-58a3961561c1ffed4ee02f0097686a57f06dd538b7059c2c69b3c0ba96e82d2e.jpg',
+    'https://i.ibb.co/6qbmmzm/img-3c59e731ffde7a3beb2f69e5d300b60c28eba6840f7690faa021d1606f7ad2b4.jpg',
+    'https://i.ibb.co/kVhGWs6C/img-f769e1baa085f737b9347a2aca78414eacc4a8828050a44aea7fdd3741cd4762.jpg'
+  ];
+
+  let loaded = 0;
+  const total = imagesToPreload.length;
+  const bar = document.getElementById('loadingBar');
+
+  function updateProgress() {
+    loaded++;
+    const pct = Math.round((loaded / total) * 100);
+    bar.style.width = pct + '%';
+    if (loaded >= total) {
+      setTimeout(() => {
+        document.getElementById('loadingScreen').style.display = 'none';
+      }, 400);
+    }
+  }
+
+  imagesToPreload.forEach(src => {
+    const img = new Image();
+    img.onload = updateProgress;
+    img.onerror = updateProgress; // 加载失败也算完成，不卡进度
+    img.src = src;
+  });
+
+  if (total === 0) {
+    document.getElementById('loadingScreen').style.display = 'none';
+  }
+})();
+  
+  if (typeof location.removedBy !== 'undefined') {
   delete location.removedBy;
 }
   // ========== 全局状态 ==========
