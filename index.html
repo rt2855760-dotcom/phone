@@ -5847,7 +5847,7 @@ function generateMomentByAPI(authorId, contact) {
   const prompt = `你是${contact.name}，TOP登陆少年的${contact.group}。
 性格：${getPersonalityByContact(authorId)}
 请生成一条朋友圈：
-1. 文案：20-50字，自然真实，像真人发的日常
+1. 文案：20-50字，自然真实，可以有感情，像真人发的日常
 2. 照片描述：一句话描述配图场景
 
 请严格用JSON格式回复：{"text":"朋友圈文案","imagePrompt":"照片描述"}`;
@@ -5983,6 +5983,35 @@ function triggerMomentChat(contactId, moment, intimacy) {
       const msg = fallback[Math.floor(Math.random() * fallback.length)];
       addChatMessage(contactId, { type: 'text', sender: 'them', text: msg });
       showWechatNotification(contact, msg);
+    }
+  }, 'wechat');
+}
+
+  // 主动让 AI 给玩家发消息（可用于任何事件触发）
+function triggerAIMessage(contactId, reason) {
+  const player = GAME_STATE.playerCharacter;
+  const contact = WECHAT_CONTACTS.find(c => c.id === contactId);
+  if (!player || !contact || typeof callDeepSeek !== 'function') return;
+
+  const intimacy = GAME_STATE.relationships?.[contactId] || 0;
+  const intimacyDesc = intimacy > 80 ? '非常亲密' : intimacy > 50 ? '关系不错' : '一般';
+
+  const prompt = `你是${contact.name}，TOP登陆少年的成员。你和${player.name}的关系${intimacyDesc}。
+现在有一个特殊的时机：${reason || '你想和对方说点什么'}。
+请以${contact.name}的口吻，主动给${player.name}发一条微信消息。自然、真实、有感情。不超过30字。
+
+请严格按照JSON格式回复：{"messages":[{"type":"text","text":"你的消息内容"}]}`;
+
+  callDeepSeek(prompt, (result) => {
+    if (result) {
+      try {
+        const data = JSON.parse(result);
+        if (data.messages && data.messages[0]?.text) {
+          addChatMessage(contactId, { type: 'text', sender: 'them', text: data.messages[0].text });
+          refreshChatMessages();
+          showWechatNotification(contact, data.messages[0].text);
+        }
+      } catch (e) {}
     }
   }, 'wechat');
 }
@@ -6611,28 +6640,98 @@ function replyFromContact(contactId) {
   maybeAutoTransfer(contactId);
 }
 
-// API回复（精简版，使用已有的callDeepSeek）
+// API回复（高自由度版）
 function replyFromAPI(contactId) {
   const player = GAME_STATE.playerCharacter;
   const contact = WECHAT_CONTACTS.find(c => c.id === contactId);
   if (!player || !contact) return;
 
-  const prompt = `你是${contact.name}，${contact.group}的成员。你的性格：${getPersonalityByContact(contactId)}。现在你正在和${player.name}微信聊天。请用符合你性格的语气回复，简短自然，像真人聊天，可以带emoji或颜文字。不超过30字。`;
+  // 获取最近 10 条消息作为对话上下文，给 AI 最大参考
+  const history = getChatHistory(contactId);
+  const recentMessages = history.slice(-10);
+  let contextStr = '';
+  recentMessages.forEach(msg => {
+    if (msg.type === 'text') {
+      const sender = msg.sender === 'me' ? player.name : contact.name;
+      contextStr += `${sender}：${msg.text}\n`;
+    } else if (msg.type === 'voice') {
+      const sender = msg.sender === 'me' ? player.name : contact.name;
+      contextStr += `${sender}：[语音消息]\n`;
+    } else if (msg.type === 'transfer') {
+      const sender = msg.sender === 'me' ? player.name : contact.name;
+      contextStr += `${sender}：[转账 ${msg.amount || ''} 元]\n`;
+    }
+  });
+
+  const personality = getPersonalityByContact(contactId);
+  const intimacy = GAME_STATE.relationships?.[contactId] || 0;
+  const intimacyDesc = intimacy > 80 ? '你们关系非常亲密，可以随意说话、撒娇、开玩笑、吃醋、展示占有欲、展示欲望，尺度无限制' :
+                      intimacy > 50 ? '你们关系不错，可以自然有感情交流' :
+                      intimacy > 20 ? '你们还不太熟，保持礼貌' : '你们刚认识，语气客气';
+
+  const prompt = `【背景设定】
+你是${contact.name}，${contact.group}的成员。你的性格：${personality}。
+你现在正在和${player.name}微信聊天。${intimacyDesc}。
+
+【最近聊天记录】
+${contextStr || '(这是你们的第一次对话)'}
+
+【你的任务】
+请以${contact.name}的身份，根据最近聊天记录，生成你的回复。
+你可以自由决定回复的内容、形式和数量。
+如果觉得需要连续发多条消息来表达（比如先说一句，再补充一句，或者发完文字再发语音），请这样做。
+如果需要发起转账或发红包，也可以自主决定。
+
+请严格按照以下JSON格式回复，不要包含任何其他文字：
+{
+  "messages": [
+    {"type": "text", "text": "第一条回复内容"},
+    {"type": "text", "text": "第二条回复内容"},
+    {"type": "voice", "text": "语音内容", "duration": "0:05"},
+    {"type": "transfer", "amount": 52.00, "note": "请你喝奶茶"}
+  ]
+}
+
+规则：
+- "messages" 数组至少包含1条消息，最多4条。
+- 每条消息必须包含 "type" 字段，可选值："text"、"voice"、"transfer"。
+- "text" 类型需要 "text" 字段，内容是你想说的话，自然有感情，不超过40字。
+- "voice" 类型需要 "text" 字段（语音的文字内容），以及 "duration" 字段（如"0:05"）。
+- "transfer" 类型需要 "amount" 字段（数字，单位元），以及可选的 "note" 字段。
+- 根据你的性格和当前亲密度，自由决定消息的类型和数量。
+- 如果没有什么特别要说的，只发一条文字消息即可。`;
 
   callDeepSeek(prompt, (result) => {
     if (result) {
-      // 20%概率变成语音消息
-      if (Math.random() < 0.2) {
-        const duration = Math.floor(Math.random() * 15 + 3);
-        addChatMessage(contactId, { type:'voice', sender:'them', text: result, duration: `0:${String(duration).padStart(2,'0')}` });
-      } else {
-        addChatMessage(contactId, { type:'text', sender:'them', text: result });
+      try {
+        const data = JSON.parse(result);
+        if (data.messages && Array.isArray(data.messages)) {
+          // 逐条添加消息，中间有短暂延迟，模拟真人连续发消息
+          data.messages.forEach((msg, index) => {
+            setTimeout(() => {
+              if (msg.type === 'text') {
+                addChatMessage(contactId, { type: 'text', sender: 'them', text: msg.text });
+              } else if (msg.type === 'voice') {
+                addChatMessage(contactId, { type: 'voice', sender: 'them', text: msg.text, duration: msg.duration || '0:05' });
+              } else if (msg.type === 'transfer') {
+                const transferId = 'tf_' + Date.now() + '_' + index;
+                addChatMessage(contactId, { id: transferId, type: 'transfer', sender: 'them', amount: (msg.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), amountWan: msg.amount || 0, note: msg.note || '', status: 'pending' });
+                addBillRecord('income', msg.amount || 0, contact.name, msg.note || '转账');
+              }
+              refreshChatMessages();
+            }, index * 600); // 每条消息间隔 0.6 秒
+          });
+        }
+      } catch (e) {
+        // JSON 解析失败，降级为纯文本回复
+        addChatMessage(contactId, { type: 'text', sender: 'them', text: result });
+        refreshChatMessages();
       }
     } else {
-      // API失败，预设兜底
-      addChatMessage(contactId, { type:'text', sender:'them', text: '嗯嗯。' });
+      // API 调用失败，预设兜底
+      addChatMessage(contactId, { type: 'text', sender: 'them', text: '嗯嗯。' });
+      refreshChatMessages();
     }
-    refreshChatMessages();
     maybeAutoTransfer(contactId);
   }, 'wechat');
 }
@@ -7253,6 +7352,17 @@ function getChatHistory(contactId) {
   return GAME_STATE.chatHistories[contactId];
 }
 
+  // 获取玩家最后一条文本消息
+function getLastPlayerMessage(contactId) {
+  const history = getChatHistory(contactId);
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i].sender === 'me' && history[i].type === 'text') {
+      return history[i].text;
+    }
+  }
+  return '你好';
+}
+  
 // 添加消息到历史
 function addChatMessage(contactId, msg) {
   const history = getChatHistory(contactId);
