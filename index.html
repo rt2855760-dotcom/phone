@@ -1734,9 +1734,12 @@ input[type="text"], input[type="number"], select {
  
 @import url('https://fonts.googleapis.com/css2?family=Zhi+Mang+Xing&display=swap');
   
-  /* 全局图片自适应 */
+ /* 全局图片自适应 */
 img {
   object-fit: cover;
+  background-color: #F0E0E5;  /* 加载失败或尺寸异常时显示浅粉底，不是黑屏 */
+  min-width: 20px;
+  min-height: 20px;
 }
   
 </style>
