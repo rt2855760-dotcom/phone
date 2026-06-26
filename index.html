@@ -4318,9 +4318,15 @@ function confirmWithdraw() {
   
  // ========== 聊天菜单 ==========
 function showChatMenu(contactId) {
-  const contact = WECHAT_CONTACTS.find(c => c.id === contactId) || 
-                   (GAME_STATE.customContacts || []).find(c => c.id === contactId);
-  if (!contact) return;
+  // 健壮查找：预设 → 自定义 → 队友 → 兜底
+let contact = WECHAT_CONTACTS.find(c => c.id === contactId);
+if (!contact) {
+  contact = (GAME_STATE.customContacts || []).find(c => c.id === contactId);
+}
+if (!contact && GAME_STATE.playerCharacter?.customTeammates) {
+  contact = GAME_STATE.playerCharacter.customTeammates.find(t => t.id === contactId);
+}
+if (!contact) return; // 都找不到才放弃
   const oldMenu = document.getElementById('chatMenuPopup');
   if (oldMenu) oldMenu.remove();
 
@@ -4456,8 +4462,15 @@ function hideChatMenu() {
 }
 // 查看联系人主页
 function viewContactProfile(contactId) {
-  const contact = WECHAT_CONTACTS.find(c => c.id === contactId);
-  if (!contact) return;
+  // 健壮查找：预设 → 自定义 → 队友 → 兜底
+let contact = WECHAT_CONTACTS.find(c => c.id === contactId);
+if (!contact) {
+  contact = (GAME_STATE.customContacts || []).find(c => c.id === contactId);
+}
+if (!contact && GAME_STATE.playerCharacter?.customTeammates) {
+  contact = GAME_STATE.playerCharacter.customTeammates.find(t => t.id === contactId);
+}
+if (!contact) return; // 都找不到才放弃
     // 修改主框架返回键为回到通讯录主界面
   const backBtn = document.querySelector('#contentHeader .back-btn');
   if (backBtn) {
@@ -6353,9 +6366,17 @@ function closeWechatChat() {
 }
 function renderWechatChatInterface(contactId) {
   const body = document.getElementById('contentBody');
-  const contact = WECHAT_CONTACTS.find(c => c.id === contactId);
-  if (!contact) return;
-
+ // 健壮查找：预设 → 自定义 → 队友 → 兜底
+let contact = WECHAT_CONTACTS.find(c => c.id === contactId);
+if (!contact) {
+  contact = (GAME_STATE.customContacts || []).find(c => c.id === contactId);
+}
+if (!contact && GAME_STATE.playerCharacter?.customTeammates) {
+  contact = GAME_STATE.playerCharacter.customTeammates.find(t => t.id === contactId);
+}
+if (!contact) {
+  contact = { id: contactId, name: '未知用户', avatar: '', group: '好友' };
+}
   const history = getChatHistory(contactId);
 
   // 首次进入：填充3条初始消息
@@ -6395,24 +6416,24 @@ function renderWechatChatInterface(contactId) {
       messagesHtml += renderTransferCard(msg, contactId);
     } else if (msg.type === 'voice') {
       messagesHtml += renderVoiceMsg(msg, contact);
-    } else {
-           const side = msg.sender === 'me' ? 'mine' : 'theirs';
-     let avatarHtml = '';
-if (side === 'theirs') {
-  // 对方头像：纯展示，不可点击换头像
-  const url = getAvatarUrl('wechat', contactId, contact.avatar);
-  if (url) {
-    avatarHtml = `<img src="${url}" style="width:42px;height:42px;border-radius:8px;object-fit:cover;flex-shrink:0;">`;
-  } else {
-    const emoji = getContactEmoji(contactId);
-    avatarHtml = `<div style="width:42px;height:42px;border-radius:8px;background:#F0E0E5;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">${emoji}</div>`;
-  }
-} else {
-  // 自己的头像：可点击换头像
-  avatarHtml = getMyAvatarHtml('wechat', 42);
-}
+        } else {
+      const side = msg.sender === 'me' ? 'mine' : 'theirs';
+      let avatarHtml = '';
+      if (side === 'theirs') {
+        // 对方头像：纯展示，不可点击换头像
+        const url = getAvatarUrl('wechat', contactId, contact.avatar);
+        if (url) {
+          avatarHtml = `<img src="${url}" style="width:42px;height:42px;border-radius:8px;object-fit:cover;flex-shrink:0;">`;
+        } else {
+          const emoji = getContactEmoji(contactId);
+          avatarHtml = `<div style="width:42px;height:42px;border-radius:8px;background:#F0E0E5;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">${emoji}</div>`;
+        }
+      } else {
+        // 自己的头像：可点击换头像
+        avatarHtml = getMyAvatarHtml('wechat', 42);
+      }
       
-           messagesHtml += `
+      messagesHtml += `
         <div class="chat-msg-row ${side}" data-index="${history.indexOf(msg)}" oncontextmenu="return false;" ontouchstart="handleMsgTouchStart(event, this, '${contactId}')" ontouchend="handleMsgTouchEnd(event, this, '${contactId}')" onmousedown="handleMsgMouseDown(event, this, '${contactId}')">
           ${avatarHtml}
           <div>
@@ -6456,8 +6477,17 @@ if (side === 'theirs') {
 function renderTransferCard(msg, contactId) {
   const isMine = msg.sender === 'me';
   const side = isMine ? 'mine' : 'theirs';
-  const contact = WECHAT_CONTACTS.find(c => c.id === contactId);
-
+  // 健壮查找：预设 → 自定义 → 队友 → 兜底
+let contact = WECHAT_CONTACTS.find(c => c.id === contactId);
+if (!contact) {
+  contact = (GAME_STATE.customContacts || []).find(c => c.id === contactId);
+}
+if (!contact && GAME_STATE.playerCharacter?.customTeammates) {
+  contact = GAME_STATE.playerCharacter.customTeammates.find(t => t.id === contactId);
+}
+if (!contact) {
+  contact = { id: contactId, name: '未知用户', avatar: '', group: '好友' };
+}
   // 头像（统一调用头像函数）
   const avatarHtml = isMine
     ? getMyAvatarHtml('wechat', 42)
