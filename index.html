@@ -6642,6 +6642,15 @@ function refreshChatMessages() {
 }   // ← 这是 refreshChatMessages 的结束大括号
 // 对方回复
 function replyFromContact(contactId) {
+  
+  // 检测是否在和李飞聊工资
+  if (contactId === 'lifei') {
+    const lastMsg = getLastPlayerMessage(contactId);
+    if (lastMsg && (lastMsg.includes('工资') || lastMsg.includes('薪水') || lastMsg.includes('钱') || lastMsg.includes('奖金') || lastMsg.includes('发薪'))) {
+      handleSalaryRequest(contactId);
+      return;
+    }
+  }
   const player = GAME_STATE.playerCharacter;
   const playerId = player ? player.id : 'custom';
   const isPreset = ['zhuzhixin','zhangzev','zhangji','zuohang','suxinhao'].includes(playerId);
@@ -6675,6 +6684,51 @@ function replyFromContact(contactId) {
   if (!GAME_STATE.relationships) GAME_STATE.relationships = {};
   if (!GAME_STATE.relationships[contactId]) GAME_STATE.relationships[contactId] = 0;
   GAME_STATE.relationships[contactId] = Math.min(100, GAME_STATE.relationships[contactId] + 1);
+  saveState();
+}
+
+  function handleSalaryRequest(contactId) {
+  const player = GAME_STATE.playerCharacter;
+  if (!player) return;
+
+  const influence = GAME_STATE.stats.influence || 0;
+  const intimacy = GAME_STATE.relationships?.[contactId] || 0;
+  const liveIncome = GAME_STATE.liveRecords?.slice(-1)?.[0]?.income || 0;
+
+  let baseAmount = 0;
+  let reply = '';
+
+  if (influence >= 80) {
+    baseAmount = 5000 + Math.floor(Math.random() * 5000);
+    reply = `最近表现不错，给你发点奖金。${baseAmount}元已到账。`;
+  } else if (influence >= 50) {
+    baseAmount = 2000 + Math.floor(Math.random() * 3000);
+    reply = `还行，继续加油。先给你发${baseAmount}元。`;
+  } else if (influence >= 30) {
+    baseAmount = 500 + Math.floor(Math.random() * 500);
+    reply = `钱不是那么好赚的。拿去吧，${baseAmount}元。`;
+  } else if (influence >= 10) {
+    baseAmount = 100 + Math.floor(Math.random() * 200);
+    reply = `就这点影响力还找我要钱？${baseAmount}元，省着点花。`;
+  } else {
+    baseAmount = 0;
+    reply = `没钱。先练好你的业务再说。`;
+  }
+
+  // 亲密度加成
+  if (intimacy > 70) {
+    const bonus = Math.floor(baseAmount * 0.5);
+    baseAmount += bonus;
+    reply += ` 看在你比较懂事的份上，多给你${bonus}元。`;
+  }
+
+  if (baseAmount > 0) {
+    GAME_STATE.stats.money = (GAME_STATE.stats.money || 0) + baseAmount;
+    addBillRecord('income', baseAmount, '公司发薪', '老板发的工资');
+  }
+
+  addChatMessage(contactId, { type: 'text', sender: 'them', text: reply });
+  refreshChatMessages();
   saveState();
 }
 
@@ -6725,7 +6779,15 @@ ${contextStr || '(这是你们的第一次对话)'}
 请以${contact.name}的身份，根据最近聊天记录，生成你的回复。
 你可以自由决定回复的内容、形式和数量。
 如果觉得需要连续发多条消息来表达（比如先说一句，再补充一句，或者发完文字再发语音），请这样做。
-如果需要发起转账或发红包，也可以自主决定。
+
+【转账规则（重要）】
+- 你可以主动发起转账或发红包，金额必须符合你们当前的好感度关系。
+- 好感度低于20：小额红包（0.01-200元），表示礼貌或感谢等可以自定义。
+- 好感度20-50：中等红包（0.01-1000元），表示友好或请喝奶茶等可以自定义。
+- 好感度50-80：大额红包（0.01-10000元），表示关心、节日祝福或请客等可以自定义。
+- 好感度80以上：亲密红包（任意金额上不封顶），表示爱意、吃醋、欲望、控制欲、占有欲或非常想念等可以自定义。
+- 转账备注可以浪漫、霸道或温柔，符合你的性格和关系，可转有特殊含义的金额如 52、66、88、99、520、666、888、1314、5200 等等可以自定义。
+- 如果没有特别必要，也可以不发，自由决定。
 
 请严格按照以下JSON格式回复，不要包含任何其他文字：
 {
