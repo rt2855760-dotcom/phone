@@ -6400,12 +6400,11 @@ function renderWechatChatInterface(contactId) {
         ? getContactAvatarHtml('wechat', contactId, contact.avatar, 42)
         : getMyAvatarHtml('wechat', 42);
       
-      messagesHtml += `
-        <div class="chat-msg-row ${side}">
+           messagesHtml += `
+        <div class="chat-msg-row ${side}" data-index="${history.indexOf(msg)}" oncontextmenu="return false;" ontouchstart="handleMsgTouchStart(event, this, '${contactId}')" ontouchend="handleMsgTouchEnd(event, this, '${contactId}')" onmousedown="handleMsgMouseDown(event, this, '${contactId}')">
           ${avatarHtml}
           <div>
-           <div class="chat-bubble ${side}">${msg.text}${side === 'mine' ? '<span style="font-size:10px; color:#B0B0B0; margin-left:6px;">已读</span>' : ''}</div>
-
+            <div class="chat-bubble ${side}">${msg.text}${side === 'mine' ? '<span style="font-size:10px; color:#B0B0B0; margin-left:6px;">已读</span>' : ''}</div>
             <div class="chat-msg-time">${msg.time || ''}</div>
           </div>
         </div>`;
@@ -6471,7 +6470,7 @@ function renderTransferCard(msg, contactId) {
   }
 
   return `
-    <div class="chat-msg-row ${side}">
+    <div class="chat-msg-row ${side}" oncontextmenu="return false;" ontouchstart="handleMsgTouchStart(event, this, '${contactId}')" ontouchend="handleMsgTouchEnd(event, this, '${contactId}')">
       ${avatarHtml}
       <div>
         <div style="
@@ -6513,7 +6512,7 @@ function renderVoiceMsg(msg, contact) {
   const voiceBars = [1,2,3].map(() => '<div class="voice-bar"></div>').join('');
 
   return `
-    <div class="chat-msg-row ${side}">
+    <div class="chat-msg-row ${side}" oncontextmenu="return false;" ontouchstart="handleMsgTouchStart(event, this, '${contactId}')" ontouchend="handleMsgTouchEnd(event, this, '${contactId}')">
       ${avatarHtml}
       <div>
         <div class="voice-msg ${side}" onclick="playVoice('${msg.text.replace(/'/g, "\\'")}')" style="min-width:${barWidth}px;">
@@ -6611,8 +6610,8 @@ function refreshChatMessages() {
       const avatarHtml = side === 'theirs'
         ? getContactAvatarHtml('wechat', contactId, contact?.avatar || '', 42)
         : getMyAvatarHtml('wechat', 42);
-      html += `
-        <div class="chat-msg-row ${side}">
+           html += `
+        <div class="chat-msg-row ${side}" data-index="${history.indexOf(msg)}" oncontextmenu="return false;" ontouchstart="handleMsgTouchStart(event, this, '${contactId}')" ontouchend="handleMsgTouchEnd(event, this, '${contactId}')" onmousedown="handleMsgMouseDown(event, this, '${contactId}')">
           ${avatarHtml}
           <div>
            <div class="chat-bubble ${side}">${msg.text}${side === 'mine' ? '<span style="font-size:10px; color:#B0B0B0; margin-left:6px;">已读</span>' : ''}</div>
@@ -6651,7 +6650,6 @@ function replyFromContact(contactId) {
       return;
     }
   }
-  const player = GAME_STATE.playerCharacter;
   const playerId = player ? player.id : 'custom';
   const isPreset = ['zhuzhixin','zhangzev','zhangji','zuohang','suxinhao'].includes(playerId);
   
@@ -7475,6 +7473,69 @@ function getContactName(contactId) {
   return contact ? contact.name : contactId;
 }
 
+  // 长按消息检测
+let msgLongPressTimer = null;
+
+function handleMsgTouchStart(e, element, contactId) {
+  msgLongPressTimer = setTimeout(() => {
+    const index = parseInt(element.getAttribute('data-index'));
+    if (!isNaN(index)) {
+      deleteMessage(contactId, index);
+    }
+  }, 500); // 长按 0.5 秒触发
+}
+
+function handleMsgTouchEnd(e, element, contactId) {
+  if (msgLongPressTimer) {
+    clearTimeout(msgLongPressTimer);
+    msgLongPressTimer = null;
+  }
+}
+
+function handleMsgMouseDown(e, element, contactId) {
+  // 桌面端：右键删除
+  if (e.button === 2) {
+    e.preventDefault();
+    const index = parseInt(element.getAttribute('data-index'));
+    if (!isNaN(index)) {
+      deleteMessage(contactId, index);
+    }
+  }
+}
+
+// 删除消息
+function deleteMessage(contactId, index) {
+  const history = getChatHistory(contactId);
+  if (index < 0 || index >= history.length) return;
+
+  const msg = history[index];
+  const preview = msg.type === 'text' ? msg.text : msg.type === 'voice' ? '[语音]' : msg.type === 'transfer' ? '[转账]' : '[消息]';
+
+  showConfirm('删除消息', `确定要删除这条消息吗？<br>"${preview.substring(0, 30)}"`, () => {
+    // 从历史中删除
+    history.splice(index, 1);
+
+    // 更新消息线程预览（如果删除的是最后一条）
+    if (history.length > 0) {
+      const lastMsg = history[history.length - 1];
+      let lastPreview = '';
+      if (lastMsg.type === 'text') {
+        lastPreview = lastMsg.text.length > 20 ? lastMsg.text.substring(0, 20) + '...' : lastMsg.text;
+      } else if (lastMsg.type === 'voice') {
+        lastPreview = '[语音] ' + (lastMsg.duration || '');
+      } else if (lastMsg.type === 'transfer') {
+        lastPreview = '[转账] ' + (lastMsg.amount || '') + '元';
+      }
+      updateMessageThread(contactId, lastPreview, false);
+    } else {
+      updateMessageThread(contactId, '', false);
+    }
+
+    saveState();
+    refreshChatMessages();
+    showToast('消息已删除');
+  });
+}
 // 获取聊天历史
 function getChatHistory(contactId) {
   if (!GAME_STATE.chatHistories) GAME_STATE.chatHistories = {};
