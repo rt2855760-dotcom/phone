@@ -6395,16 +6395,10 @@ function renderWechatChatInterface(contactId) {
     } else if (msg.type === 'voice') {
       messagesHtml += renderVoiceMsg(msg, contact);
     } else {
-      const side = msg.sender === 'me' ? 'mine' : 'theirs';
-             // 双方头像
-      let avatarHtml = '';
-      const avatarUrl = side === 'theirs' ? contact.avatar : getMyAvatar();
-      const placeholderText = side === 'theirs' ? getContactAvatar(contact) : (GAME_STATE.playerCharacter?.name?.[0] || '我');
-      if (avatarUrl) {
-        avatarHtml = `<div class="chat-avatar" style="background-image:url('${avatarUrl}')"></div>`;
-      } else {
-        avatarHtml = `<div class="chat-avatar-placeholder">${placeholderText}</div>`;
-      }
+           const side = msg.sender === 'me' ? 'mine' : 'theirs';
+      const avatarHtml = side === 'theirs'
+        ? getContactAvatarHtml('wechat', contactId, contact.avatar, 42)
+        : getMyAvatarHtml('wechat', 42);
       
       messagesHtml += `
         <div class="chat-msg-row ${side}">
@@ -6453,16 +6447,10 @@ function renderTransferCard(msg, contactId) {
   const side = isMine ? 'mine' : 'theirs';
   const contact = WECHAT_CONTACTS.find(c => c.id === contactId);
 
-  // 头像
-  let avatarHtml = '';
-  const avatarUrl = isMine ? getMyAvatar() : (contact?.avatar || '');
-  const placeholderText = isMine ? (GAME_STATE.playerCharacter?.name?.[0] || '我') : getContactAvatar(contact || {});
-  if (avatarUrl) {
-    avatarHtml = `<div class="chat-avatar" style="background-image:url('${avatarUrl}')"></div>`;
-  } else {
-    avatarHtml = `<div class="chat-avatar-placeholder">${placeholderText}</div>`;
-  }
-
+  // 头像（统一调用头像函数）
+  const avatarHtml = isMine
+    ? getMyAvatarHtml('wechat', 42)
+    : getContactAvatarHtml('wechat', contactId, contact?.avatar || '', 42);
   const amountDisplay = (msg.amountWan || parseFloat(msg.amount) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   // 标题文字（无emoji）
@@ -6518,14 +6506,9 @@ function renderVoiceMsg(msg, contact) {
   const maxWidth = 180;
   const barWidth = Math.min(maxWidth, minWidth + durationSec * 6); // 每秒加6px宽度
 
-  let avatarHtml = '';
-  const avatarUrl = side === 'theirs' ? (contact?.avatar || '') : getMyAvatar();
-  const placeholderText = side === 'theirs' ? getContactAvatar(contact || {}) : (GAME_STATE.playerCharacter?.name?.[0] || '我');
-  if (avatarUrl) {
-    avatarHtml = `<div class="chat-avatar" style="background-image:url('${avatarUrl}')"></div>`;
-  } else {
-    avatarHtml = `<div class="chat-avatar-placeholder">${placeholderText}</div>`;
-  }
+    const avatarHtml = side === 'theirs'
+    ? getContactAvatarHtml('wechat', contact?.id || '', contact?.avatar || '', 42)
+    : getMyAvatarHtml('wechat', 42);
 
   const voiceBars = [1,2,3].map(() => '<div class="voice-bar"></div>').join('');
 
@@ -6624,15 +6607,10 @@ function refreshChatMessages() {
     } else if (msg.type === 'voice') {
       html += renderVoiceMsg(msg, contact);
     } else {
-           const side = msg.sender === 'me' ? 'mine' : 'theirs';
-      let avatarHtml = '';
-      const avatarUrl = side === 'theirs' ? (contact?.avatar || '') : getMyAvatar();
-      const placeholderText = side === 'theirs' ? getContactAvatar(contact || {}) : (GAME_STATE.playerCharacter?.name?.[0] || '我');
-      if (avatarUrl) {
-        avatarHtml = `<div class="chat-avatar" style="background-image:url('${avatarUrl}')"></div>`;
-      } else {
-        avatarHtml = `<div class="chat-avatar-placeholder">${placeholderText}</div>`;
-      }
+               const side = msg.sender === 'me' ? 'mine' : 'theirs';
+      const avatarHtml = side === 'theirs'
+        ? getContactAvatarHtml('wechat', contactId, contact?.avatar || '', 42)
+        : getMyAvatarHtml('wechat', 42);
       html += `
         <div class="chat-msg-row ${side}">
           ${avatarHtml}
